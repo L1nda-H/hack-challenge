@@ -1,12 +1,7 @@
-import json
-
 from db import db
 from flask import Flask, request
-from db import Course
-from db import User
-from db import Assignment
-
-import os
+import json
+from db import Course, User
 
 app = Flask(__name__)
 db_filename = "cms.db"
@@ -19,273 +14,98 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+# generalized response formats
+def success_response(data, code=200):
+    return json.dumps(data), code
+def failure_response(message, code=404):
+    return json.dumps({"error": message}), code
 
-# your routes here
+#Courses
+@app.route("/api/courses/")
+def get_courses():
+    """
+    Gets all courses
+    """
+    courses = [c.serialize() for c in Course.query.all()]
+    return success_response({"courses": courses}, 200)
 
-
-# Get all courses
-@app.route("/api/courses/", methods=["GET"])
-def get_all_courses():
-    courses = Course.query.all()
-    serialized_courses = [
-        {"id": course.id, "code": course.code, "name": course.name}
-        for course in courses
-    ]
-    return json.dumps({"courses": serialized_courses}), 200
-
-
-# Create a course
 @app.route("/api/courses/", methods=["POST"])
 def create_course():
-    data = request.get_json()
-    code = data.get("code")
-    name = data.get("name")
+    """
+    Creates a course
 
-    if not code or not name:
-        return json.dumps({"error": "Both code and name are required"}), 400
-
-    course = Course(code=code, name=name)
-    db.session.add(course)
+    name: course's title
+    """
+    body = json.loads(request.data)
+    course_name = body.get("name")
+    if course_name is None:
+        return failure_response("Sufficient information not provided", 400)
+    new_course = Course(name=course_name)
+    db.session.add(new_course)
     db.session.commit()
+    return success_response(new_course.serialize(), 201)
 
-    return (
-        json.dumps(
-            {
-                "id": course.id,
-                "code": course.code,
-                "name": course.name,
-                "assignments": [
-                    {
-                        "id": assignment.id,
-                        "title": assignment.title,
-                        "due_date": assignment.due_date,
-                    }
-                    for assignment in course.assignments
-                ],
-                "instructors": [
-                    {
-                        "id": instructor.id,
-                        "name": instructor.name,
-                        "netid": instructor.netid,
-                    }
-                    for instructor in course.instructors
-                ],
-                "students": [
-                    {"id": student.id, "name": student.name, "netid": student.netid}
-                    for student in course.students
-                ],
-            }
-        ),
-        201,
-    )
-
-
-# Get a specific course
-@app.route("/api/courses/<int:id>/", methods=["GET"])
-def get_course(id):
-    course = Course.query.get(id)
-    if course is None:
-        return json.dumps({"error": "Course not found"}), 404
-
-    serialized_course = {
-        "id": course.id,
-        "code": course.code,
-        "name": course.name,
-        "assignments": [
-            {
-                "id": assignment.id,
-                "title": assignment.title,
-                "due_date": assignment.due_date,
-            }
-            for assignment in course.assignments
-        ],
-        "instructors": [
-            {"id": instructor.id, "name": instructor.name, "netid": instructor.netid}
-            for instructor in course.instructors
-        ],
-        "students": [
-            {"id": student.id, "name": student.name, "netid": student.netid}
-            for student in course.students
-        ],
-    }
-
-    return json.dumps(serialized_course), 200
-
-
-# Delete a specific course
-@app.route("/api/courses/<int:id>/", methods=["DELETE"])
-def delete_course(id):
-    course = Course.query.get(id)
-    if course is None:
-        return json.dumps({"error": "Course not found"}), 404
-
-    db.session.delete(course)
-    db.session.commit()
-
-    serialized_course = {
-        "id": course.id,
-        "code": course.code,
-        "name": course.name,
-        "assignments": [
-            {
-                "id": assignment.id,
-                "title": assignment.title,
-                "due_date": assignment.due_date,
-            }
-            for assignment in course.assignments
-        ],
-        "instructors": [
-            {"id": instructor.id, "name": instructor.name, "netid": instructor.netid}
-            for instructor in course.instructors
-        ],
-        "students": [
-            {"id": student.id, "name": student.name, "netid": student.netid}
-            for student in course.students
-        ],
-    }
-    return json.dumps(serialized_course), 200
-
-
-# Create a user
+# User
+@app.route("/api/users/")
 @app.route("/api/users/", methods=["POST"])
 def create_user():
-    data = request.get_json()
-    name = data.get("name")
-    netid = data.get("netid")
+    """
+    Creates a user
 
-    if not name or not netid:
-        return json.dumps({"error": "Both name and netid are required"}), 400
-
-    user = User(name=name, netid=netid)
-    db.session.add(user)
+    name: user's name
+    netid: user's netid
+    """
+    body = json.loads(request.data)
+    user_name = body.get("name")
+    user_netid = body.get("netid")
+    if user_name is None or user_netid is None:
+        return failure_response("Sufficient information not provided", 400)
+    new_user = User(name=user_name, netid=user_netid)
+    db.session.add(new_user)
     db.session.commit()
+    return success_response(new_user.serialize(), 201)
 
-    return (
-        json.dumps(
-            {"id": user.id, "name": user.name, "netid": user.netid, "courses": []}
-        ),
-        201,
-    )
+@app.route("/api/users/<int:user_id>/", methods=["DELETE"])
+def delete_user(user_id):
+    """
+    Deletes a user from database, and removes them as tutors/tutees
 
-
-# Get a specific user
-@app.route("/api/users/<int:id>/", methods=["GET"])
-def get_user(id):
-    user = User.query.get(id)
+    user_id: id of user to delete
+    """
+    user = User.query.filter_by(id=user_id).first()
     if user is None:
-        return json.dumps({"error": "User not found"}), 404
-
-    student_courses = [
-        {"id": course.id, "code": course.code, "name": course.name}
-        for course in user.courses_as_student
-    ]
-
-    # Get courses where the user is an instructor
-    instructor_courses = [
-        {"id": course.id, "code": course.code, "name": course.name}
-        for course in user.courses_as_instructor
-    ]
-
-    # Combine both lists of courses
-    courses = student_courses + instructor_courses
-    serialized_user = {
-        "id": user.id,
-        "name": user.name,
-        "netid": user.netid,
-        "courses": courses,
-    }
-
-    return json.dumps(serialized_user), 200
-
-
-# Add a user to a course
-@app.route("/api/courses/<int:id>/add/", methods=["POST"])
-def add_user_to_course(id):
-    data = request.get_json()
-    user_id = data.get("user_id")
-    user_type = data.get("type")
-
-    if not user_id or user_type not in ["student", "instructor"]:
-        return (
-            json.dumps(
-                {"error": "Both user_id and type (student or instructor) are required"}
-            ),
-            400,
-        )
-
-    course = Course.query.get(id)
-    user = User.query.get(user_id)
-
-    if course is None or user is None:
-        return json.dumps({"error": "Course or user not found"}), 404
-
-    if user_type == "student":
-        course.students.append(user)
-    elif user_type == "instructor":
-        course.instructors.append(user)
-
+        return failure_response("User not found")
+    db.session.delete(user)
     db.session.commit()
+    return success_response(user.serialize())
 
-    serialized_course = {
-        "id": course.id,
-        "code": course.code,
-        "name": course.name,
-        "assignments": [
-            {
-                "id": assignment.id,
-                "title": assignment.title,
-                "due_date": assignment.due_date,
-            }
-            for assignment in course.assignments
-        ],
-        "instructors": [
-            {"id": instructor.id, "name": instructor.name, "netid": instructor.netid}
-            for instructor in course.instructors
-        ],
-        "students": [
-            {"id": student.id, "name": student.name, "netid": student.netid}
-            for student in course.students
-        ],
-    }
+# Relational Method
+@app.route("/api/courses/<int:course_id>/add/", methods=["POST"])
+def add_user_to_course(course_id):
+    """
+    Adds user to a course as a tutor or tutee
 
-    return json.dumps(serialized_course), 200
-
-
-# Create an assignment for a course
-@app.route("/api/courses/<int:id>/assignment/", methods=["POST"])
-def create_assignment(id):
-    data = request.get_json()
-    title = data.get("title")
-    due_date = data.get("due_date")
-
-    if not title or not due_date:
-        return json.dumps({"error": "Both title and due_date are required"}), 400
-
-    course = Course.query.get(id)
+    user_id: user id
+    type: type of user, tutor or tutee
+    """
+    course = Course.query.filter_by(id=course_id).first()
     if course is None:
-        return json.dumps({"error": "Course not found"}), 404
-
-    assignment = Assignment(title=title, due_date=due_date, course_id=id)
-    db.session.add(assignment)
+        return failure_response("Course not found")
+    body = json.loads(request.data)
+    user_id = body.get("user_id")
+    user_type = body.get("type")
+    if user_id is None or user_type is None:
+        return failure_response("Sufficient information not provided", 400)
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        return failure_response("User not found")
+    user.type = user_type
+    if user_type == "tutee":
+        course.tutees.append(user)
+    else:
+        course.tutors.append(user)
     db.session.commit()
-
-    serialized_assignment = {
-        "id": assignment.id,
-        "title": assignment.title,
-        "due_date": assignment.due_date,
-        "course": {
-            "id": course.id,
-            "code": course.code,
-            "name": course.name,
-        },
-    }
-
-    return json.dumps(serialized_assignment), 201
-
-
-@app.route("/", methods=["GET"])
-def greeting():
-    return "hello"
+    return success_response(course.serialize())
 
 
 if __name__ == "__main__":
