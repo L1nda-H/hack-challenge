@@ -2,63 +2,117 @@ from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
+# table
+tutee_table = db.Table(
+    "tutee association",
+    db.Model.metadata,
+    db.Column("course_id", db.Integer, db.ForeignKey("course.id")),
+    db.Column("user_id", db.Integer, db.ForeignKey("user.id"))
+)
+tutor_table = db.Table(
+    "tutor association",
+    db.Model.metadata,
+    db.Column("course_id", db.Integer, db.ForeignKey("course.id")),
+    db.Column("user_id", db.Integer, db.ForeignKey("user.id"))
+)
+
 # your classes here
 
 
-# Course model
 class Course(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    code = db.Column(db.String(10), unique=True, nullable=False)
-    name = db.Column(db.String(100), nullable=False)
-    assignments = db.relationship("Assignment", backref="course", lazy=True)
-    instructors = db.relationship(
-        "User",
-        secondary="course_instructor",
-        back_populates="courses_as_instructor",
-        lazy="dynamic",
-    )
-    students = db.relationship(
-        "User",
-        secondary="course_student",
-        back_populates="courses_as_student",
-        lazy="dynamic",
-    )
+    """
+    Course Model
+    """
+    __tablename__ = "course"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    # code = db.Column(db.String, nullable=False)
+    name = db.Column(db.String, nullable=False)
+    assignments = db.relationship(
+        "Assignment", cascade="delete")
+    tutors = db.relationship(
+        "User", secondary=tutor_table, back_populates="tutor_courses")
+    tutees = db.relationship(
+        "User", secondary=tutee_table, back_populates="tutee_courses")
+
+    def __init__(self, **kwargs):
+        """
+        Initialize a Course object
+        """
+        self.code = kwargs.get("code", "")
+        self.name = kwargs.get("name", "")
+
+    def serialize(self):
+        """
+        Serialize Course object
+        """
+        return {
+            "id": self.id,
+            # "code": self.code,
+            "name": self.name,
+            # "assignments": [a.simple_serialize() for a in self.assignments],
+            "tutors": [u.simple_serialize() for u in self.tutors],
+            "tutees": [u.simple_serialize() for u in self.tutees]
+        }
+
+    def simple_serialize(self):
+        """
+        Simple Serialize Course object
+        """
+        return {
+            "id": self.id,
+            # "code": self.code,
+            "name": self.name,
+        }
+
+# many to many with Courses
 
 
-# User model
 class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    netid = db.Column(db.String(20), unique=True, nullable=False)
-    courses_as_instructor = db.relationship(
-        "Course",
-        secondary="course_instructor",
-        back_populates="instructors",
-        lazy="dynamic",
-    )
-    courses_as_student = db.relationship(
-        "Course", secondary="course_student", back_populates="students", lazy="dynamic"
-    )
+    """
+    User Model
+    """
+    __tablename__ = "user"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String, nullable=False)
+    netid = db.Column(db.String, nullable=False)
+    type = db.Column(db.String, nullable=True)
+    tutor_courses = db.relationship(
+        "Course", secondary=tutor_table, back_populates="instructors")
+    tutee_courses = db.relationship(
+        "Course", secondary=tutee_table, back_populates="students")
 
+    def __init__(self, **kwargs):
+        """
+        Initialize a User object
+        """
+        self.name = kwargs.get("name", "")
+        self.netid = kwargs.get("netid", "")
+        self.type = kwargs.get("type", "")
 
-# Many-to-Many association table for instructors
-course_instructor = db.Table(
-    "course_instructor",
-    db.Column("course_id", db.Integer, db.ForeignKey("course.id"), primary_key=True),
-    db.Column("user_id", db.Integer, db.ForeignKey("user.id"), primary_key=True),
-)
+    def serialize(self):
+        """
+        Serialize User object: **Decide how to serialize based on what is needed
+        from API endpoints**
+        """
 
-# Many-to-Many association table for students
-course_student = db.Table(
-    "course_student",
-    db.Column("course_id", db.Integer, db.ForeignKey("course.id"), primary_key=True),
-    db.Column("user_id", db.Integer, db.ForeignKey("user.id"), primary_key=True),
-)
+        # courses = []
+        # for i in self.instructor_courses:
+        #     courses.append(i)
+        # for j in self.student_courses:
+        #     courses.append(j)
+        # return {
+        #     "id": self.id,
+        #     "name": self.name,
+        #     "netid": self.netid,
+        #     "courses": [c.simple_serialize() for c in courses]
+        # }
 
-
-# Assignment model
-class Assignment(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    due_date = db.Column(db.Integer, nullable=False)
-    course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
+    def simple_serialize(self):
+        """"
+        Serialize User object without the courses field
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "netid": self.netid
+        }
