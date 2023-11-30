@@ -1,7 +1,7 @@
 from db import db
 from flask import Flask, request
 import json
-from db import Course, User
+from db import Course, User, Post
 
 app = Flask(__name__)
 db_filename = "cms.db"
@@ -14,13 +14,17 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+
 # generalized response formats
 def success_response(data, code=200):
     return json.dumps(data), code
+
+
 def failure_response(message, code=404):
     return json.dumps({"error": message}), code
 
-#Courses
+
+# Courses
 @app.route("/api/courses/")
 def get_courses():
     """
@@ -28,6 +32,7 @@ def get_courses():
     """
     courses = [c.serialize() for c in Course.query.all()]
     return success_response({"courses": courses}, 200)
+
 
 @app.route("/api/courses/", methods=["POST"])
 def create_course():
@@ -44,6 +49,7 @@ def create_course():
     db.session.add(new_course)
     db.session.commit()
     return success_response(new_course.serialize(), 201)
+
 
 # User
 @app.route("/api/users/")
@@ -65,6 +71,7 @@ def create_user():
     db.session.commit()
     return success_response(new_user.serialize(), 201)
 
+
 @app.route("/api/users/<int:user_id>/", methods=["DELETE"])
 def delete_user(user_id):
     """
@@ -78,6 +85,7 @@ def delete_user(user_id):
     db.session.delete(user)
     db.session.commit()
     return success_response(user.serialize())
+
 
 # Relational Method
 @app.route("/api/courses/<int:course_id>/add/", methods=["POST"])
@@ -104,6 +112,25 @@ def add_user_to_course(course_id):
         course.tutees.append(user)
     else:
         course.tutors.append(user)
+    db.session.commit()
+    return success_response(course.serialize())
+
+
+@app.route("api/users/<int:user_id>/", methods=["POST"])
+def create_post(user_id):
+    """
+    Make a post by a user
+    """
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        return failure_response("User not found")
+    body = json.loads(request.data)
+    title = body.get("title")
+    content = body.get("content")
+    availability = body.get("availability")
+    course = body.get("course")
+    new_post = Post(title=title, content=content, availability=availability)
+    db.session.add(new_post)
     db.session.commit()
     return success_response(course.serialize())
 
