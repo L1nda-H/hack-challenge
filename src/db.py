@@ -118,10 +118,10 @@ class User(db.Model):
     netid = db.Column(db.String, nullable=False)
     type = db.Column(db.String, nullable=True)
     tutor_courses = db.relationship(
-        "Course", secondary=tutor_table, back_populates="instructors"
+        "Course", secondary=tutor_table, back_populates="tutors"
     )
     tutee_courses = db.relationship(
-        "Course", secondary=tutee_table, back_populates="students"
+        "Course", secondary=tutee_table, back_populates="tutees"
     )
     posts = db.relationship("Post", cascade="delete")
 
