@@ -23,12 +23,14 @@ def success_response(data, code=200):
 def failure_response(message, code=404):
     return json.dumps({"error": message}), code
 
+
 @app.route("/")
 def base():
     """
     Base endpoint
     """
     return success_response("Welcome to LearnWell", 200)
+
 
 # Courses
 @app.route("/api/courses/")
@@ -55,6 +57,7 @@ def create_course():
     db.session.add(new_course)
     db.session.commit()
     return success_response(new_course.serialize(), 201)
+
 
 # User
 @app.route("/api/users/", methods=["POST"])
@@ -123,10 +126,11 @@ def add_user_to_course(course_id):
 @app.route("/api/posts/")
 def get_posts(user_id):
     """
-    Make a post by a user
+    Get all posts by a user
     """
     posts = [p.serialize() for p in Post.query.all()]
     return success_response({"posts": posts}, 200)
+
 
 @app.route("/api/posts/<int:user_id>/", methods=["POST"])
 def create_post(user_id):
