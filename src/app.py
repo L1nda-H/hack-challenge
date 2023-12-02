@@ -23,6 +23,12 @@ def success_response(data, code=200):
 def failure_response(message, code=404):
     return json.dumps({"error": message}), code
 
+@app.route("/")
+def base():
+    """
+    Base endpoint
+    """
+    return success_response("Welcome to LearnWell", 200)
 
 # Courses
 @app.route("/api/courses/")
@@ -114,7 +120,7 @@ def add_user_to_course(course_id):
     return success_response(course.serialize())
 
 
-@app.route("api/users/<int:user_id>/", methods=["POST"])
+@app.route("/api/users/<int:user_id>/", methods=["POST"])
 def create_post(user_id):
     """
     Make a post by a user
