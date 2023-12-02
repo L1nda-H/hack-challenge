@@ -50,9 +50,7 @@ def create_course():
     db.session.commit()
     return success_response(new_course.serialize(), 201)
 
-
 # User
-@app.route("/api/users/")
 @app.route("/api/users/", methods=["POST"])
 def create_user():
     """

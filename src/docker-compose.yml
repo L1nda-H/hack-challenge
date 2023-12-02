@@ -2,7 +2,6 @@ version: "3"
 
 services:
   demo:
-    image: "llh87/a5:newest"
+    image: "siachitnis/hack"
     ports:
       - "8000:8000"
-    env_file: .env
