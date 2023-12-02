@@ -120,7 +120,15 @@ def add_user_to_course(course_id):
     return success_response(course.serialize())
 
 
-@app.route("/api/users/<int:user_id>/", methods=["POST"])
+@app.route("/api/posts/")
+def get_posts(user_id):
+    """
+    Make a post by a user
+    """
+    posts = [p.serialize() for p in Post.query.all()]
+    return success_response({"posts": posts}, 200)
+
+@app.route("/api/posts/<int:user_id>/", methods=["POST"])
 def create_post(user_id):
     """
     Make a post by a user
