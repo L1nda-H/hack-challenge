@@ -4,4 +4,4 @@ services:
   demo:
     image: "siachitnis/hack"
     ports:
-      - "8000:8000"
+      - "8000:5000"
